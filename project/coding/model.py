@@ -18,7 +18,7 @@ dbpath = 'project\culture.db'
 
 conn = sqlite3.connect(dbpath)
 cur = conn.cursor()
-culture = pd.read_sql("SELECT * FROM outdoor;",conn, index_col=None)
+culture = pd.read_sql("SELECT * FROM cultural;",conn, index_col=None)
 
 # culture = pd.read_sql("SELECT * FROM outdoor;",conn, index_col=None)
 
@@ -40,7 +40,7 @@ culture = culture.drop(columns=['start_period', 'end_period'])
 culcsv = culture.copy()
 train = culcsv.copy()
 
-target = 'door'
+target = 'region_number'
 train, val = train_test_split(train ,train_size=0.80,test_size = 0.20, stratify=train[target],random_state=2)
 
 X_train = train.drop(columns=target)

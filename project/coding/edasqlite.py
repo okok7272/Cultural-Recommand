@@ -49,7 +49,19 @@ def typeEnc(x):
         x=2
     return x
 
-culture['door']= culture['door_type'].apply(typeEnc)
+def typelocation(x):
+  if x == "서울":
+    x=0
+  elif x == "경기":
+    x=1
+  elif x == "부산":
+    x=2
+  else:
+    x=3
+  return x
 
+
+culture['door']= culture['door_type'].apply(typeEnc)
+culture['region_number']=culture['region'].apply(typelocation)
 sqlcon = sqlite3.connect('project/culture.db')
-culture.to_sql('outdoor',sqlcon)
+culture.to_sql('cultural',sqlcon)
