@@ -20,30 +20,30 @@ def startpage():
     culture = pd.read_sql("SELECT * FROM cultural;",conn, index_col=None)
 
     cultur2 =culture.copy()
-    cultur2.drop(columns=['end_period','start_period','door','region_number'])
+    cultur2=cultur2.drop(columns=['end_period','start_period','region_number'])
     if request.method == 'POST':
         title = request.form['title_name']
         select_title=title
         select_cond = cultur2['title']==title
         select_data = cultur2[select_cond]
         if(select_data.empty):
-            return redirect(url_for('/errorpage'))
+            return redirect(url_for('errorpage'))
         model=None
         with open(r'C:\Users\InKoo\Section3\Cultural-Recommand\project\model.pkl', 'rb') as pickle_file:
             model=pickle.load(pickle_file)
         pred = model.predict(select_data)
-        return redirect(url_for('selectdata', door=pred))
+        return redirect(url_for('selectdata', region_number=pred))
 
     return render_template('main.html')
 
-@app.route('/select',methods =['GET','POST'])
-def selectdata(door):
+@app.route('/select/<region_number>',methods =['GET','POST'])
+def selectdata(region_number):
     conn = sqlite3.connect(r'C:\Users\InKoo\Section3\Cultural-Recommand\project\culture.db')
     cur = conn.cursor()
     culture = pd.read_sql("SELECT * FROM cultural;",conn, index_col=None)
 
     content_title = request.form['title_name']
-    door1 = door
+    door1 = region_number
     cult3= culture[culture['region_number']==door1]
     cult3.to_json('project/cult.json',orient='records')
     cult4 = cult3
