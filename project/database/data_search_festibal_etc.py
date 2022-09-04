@@ -1,0 +1,481 @@
+import pandas as pd
+import requests
+import re
+from fake_useragent import UserAgent
+from bs4 import BeautifulSoup
+import csv
+import sqlite3
+import glob
+import os
+from PIL import Image
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException,TimeoutException
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support import expected_conditions as EC
+import time
+from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.keys import Keys
+
+#database 구축
+dbpath = "exfes.db"
+conn = sqlite3.connect(dbpath)
+cur = conn.cursor()
+
+door_type = 'festibal'
+
+script = """ 
+DELETE FROM outdoor WHERE door_type = 'festibal' AND region = "타지역";
+"""
+
+cur.executescript(script)
+
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+
+
+#대전
+driver.find_element(by=By.CSS_SELECTOR, value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "대전"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT, value="대전").click()
+driver.implicitly_wait(100)
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    total_num = int(total_str)
+    for i in range(1, total_num):
+        ##mflick > div > div > div > div:nth-child(1)
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except NoSuchElementException:
+            break
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    
+    driver.implicitly_wait(100)
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+
+    driver.implicitly_wait(15)
+
+    if(cur_page==end_page):
+        break
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#인천
+driver.find_element(by=By.CSS_SELECTOR, value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "인천"))).click()
+driver.implicitly_wait(100)
+driver.find_element(by=By.LINK_TEXT, value="인천").click()
+driver.implicitly_wait(100)
+
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    try:
+        total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    except TimeoutException:
+        total_str = ''
+    total_num = 1
+    if(total_str==''):
+        total_num = 1
+    else:
+        total_num = int(total_str)  
+
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+
+        cur_page = 1
+        end_page = 1
+
+    if(cur_page==end_page):
+        break
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#대구
+driver.find_element(by=By.CSS_SELECTOR,value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "대구"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT,value="대구").click()
+driver.implicitly_wait(100)
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    itemlist = driver.find_elements(By.CSS_SELECTOR,'#mflick > div > div > div')
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    total_num = int(total_str)
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except NoSuchElementException:
+            break
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    
+    driver.implicitly_wait(100)
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(15)
+
+    if(cur_page==end_page):
+        break
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#광주
+driver.find_element(by=By.CSS_SELECTOR,value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "광주"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT,value="광주").click()
+driver.implicitly_wait(100)
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    itemlist = driver.find_elements(By.CSS_SELECTOR,'#mflick > div > div > div')
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    total_num = int(total_str)
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except:
+            break
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    
+    driver.implicitly_wait(100)
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(15)
+    if(cur_page==end_page):
+        break
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#울산
+driver.find_element(by=By.CSS_SELECTOR,value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "울산"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT,value="울산").click()
+driver.implicitly_wait(100)
+
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(100)
+
+    total_num = int(total_str)
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except NoSuchElementException:
+            break
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    driver.implicitly_wait(100)
+    
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(15)
+    if(cur_page==end_page):
+        break
+
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#세종
+driver.find_element(by=By.CSS_SELECTOR,value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "세종"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT,value="세종").click()
+driver.implicitly_wait(100)
+
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    total_num = 1
+    if(total_str==''):
+        total_num = 1
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except NoSuchElementException:
+            break
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    
+    driver.implicitly_wait(100)
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(15)
+    if(cur_page==end_page):
+        break
+
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#충북
+driver.find_element(by=By.CSS_SELECTOR,value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "충북"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT,value="충북").click()
+driver.implicitly_wait(100)
+
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    total_num = int(total_str)
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except NoSuchElementException:
+            break
+
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    
+    driver.implicitly_wait(100)
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(15)
+    if(cur_page==end_page):
+        break
+
+driver.quit()
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)
+driver.implicitly_wait(100000)
+driver.get('https://search.naver.com/search.naver?where=nexearch&sm=tab_etc&mra=bk00&qvt=0&query=%EC%B6%95%EC%A0%9C')
+
+#충남
+driver.find_element(by=By.CSS_SELECTOR,value="#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap").click()
+driver.implicitly_wait(100)
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tap_area.type_festival > div > div.type_scroll > ul > li:nth-child(1) > a > span.ico_check_wrap"))).click()
+driver.implicitly_wait(100)
+
+WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "충남"))).click()
+driver.implicitly_wait(100)
+
+driver.find_element(by=By.LINK_TEXT,value="충남").click()
+driver.implicitly_wait(100)
+
+while True:
+#mflick > div > div > div > div:nth-child(1) > div:nth-child(1)
+    itemlist = driver.find_elements(By.CSS_SELECTOR,'#mflick > div > div > div')
+    total_str = driver.find_element(By.CSS_SELECTOR,'#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    total_num = int(total_str)
+    for i in range(1, total_num):
+        items = driver.find_elements(By.CSS_SELECTOR,f'#mflick > div > div > div > div:nth-child({i}) > div')
+        for item in items:
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.title > div > strong > a
+            title = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.title > div > strong > a').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(2)
+            period = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(2)').text
+            start_period,end_period = period.split('~')
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > div > div.info > dl > dd:nth-child(4)
+            location = item.find_element(By.CSS_SELECTOR,'div.data_area > div > div.info > dl > dd:nth-child(4)').text
+            #mflick > div > div > div > div:nth-child(1) > div:nth-child(1) > div.data_area > a > img
+            poster = item.find_element(By.CSS_SELECTOR,'div.data_area > a > img').get_attribute('src')
+            region = "타지역"
+        #데이터베이스에 넣기    
+            base_sql = """INSERT INTO outdoor(door_type,title, region, start_period, end_period, location, poster) values("{}","{}", '{}', '{}', '{}', '{}', '{}')"""
+            sql_query = base_sql.format(door_type,title, region, start_period, end_period, location, poster)
+            cur.execute(sql_query)
+            conn.commit()
+            time.sleep(4)
+        try:
+            WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.LINK_TEXT, "다음"))).click()
+            time.sleep(4)
+        except NoSuchElementException:
+            break
+    cur_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > strong').text
+    
+    driver.implicitly_wait(100)
+    end_page = driver.find_element(By.CSS_SELECTOR, '#main_pack > div.sc_new.cs_common_module.case_list.color_1._cs_festival_list > div.cm_content_wrap > div > div > div.cm_tab_content > div.cm_paging_area > div > span > span._total').text
+    driver.implicitly_wait(15)
+    if(cur_page==end_page):
+        break
+driver.quit()
+
