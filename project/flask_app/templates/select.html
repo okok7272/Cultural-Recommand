@@ -11,10 +11,10 @@
     <title>select</title>
 </head>
 <body>
-    {% for content in cult4 %}
-    <p>{{ content.title }}</p>
-    <p>{{ content.start_period }}</p>
-    <p>{{ content.end_period }}</p>
-    <p>{{ content.region }}</p>
+    {% for row in cult4.itertuples() %}
+    <p>{{ row.title }}</p>
+    <p>{{ row.start_period }}</p>
+    <p>{{ row.end_period }}</p>
+    <p>{{ row.region }}</p>
     {% endfor %}</body>
 </html>

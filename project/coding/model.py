@@ -41,12 +41,10 @@ culcsv = culture.copy()
 train = culcsv.copy()
 
 target = 'region_number'
-train, val = train_test_split(train ,train_size=0.80,test_size = 0.20, stratify=train[target],random_state=2)
 
 X_train = train.drop(columns=target)
 y_train = train[target]
-X_val = val.drop(columns=target)
-y_val = val[target]
+
 
 pipe = make_pipeline(
     # TargetEncoder: 범주형 변수 인코더로, 타겟값을 특성의 범주별로 평균내어 그 값으로 인코딩
